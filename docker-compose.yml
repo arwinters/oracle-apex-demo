@@ -1,0 +1,55 @@
+services:
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    platform: linux/amd64
+    container_name: oracle-apex-db
+    ports:
+      - "1521:1521"
+    environment:
+      - ORACLE_PWD=Welkom123
+      - ORACLE_CHARACTERSET=AL32UTF8
+    volumes:
+      - ./scripts:/opt/oracle/scripts/setup
+      - ./apex:/opt/oracle/apex
+      - oracle_data:/opt/oracle/oradata
+    command: ["/opt/oracle/scripts/setup/db-entrypoint-wrapper.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s / as sysdba | grep -q 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  ords:
+    image: container-registry.oracle.com/database/ords:latest
+    platform: linux/amd64
+    container_name: oracle-ords
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    environment:
+      - CONN_STRING=oracle-db:1521/XEPDB1
+      - ORACLE_PWD=Welkom123
+      - ORDS_PWD=Welkom123
+      - APEX_PUBLIC_USER_PWD=Welkom123
+      - ORDS_CONFIG_DIR=/etc/ords/config
+      - ORDS_LOG_DIR=/etc/ords/logs
+      - ORDS_PORT=8080
+    ports:
+      - "8181:8080"
+    volumes:
+      - ./ords_config:/etc/ords/config
+      - ./ords_logs:/etc/ords/logs
+      - ./scripts:/opt/oracle/scripts/setup
+      - ./apex:/opt/oracle/apex:ro
+    entrypoint: ["/bin/bash"]
+    command: ["/opt/oracle/scripts/setup/start_ords.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ords/_/landing || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
+volumes:
+  oracle_data:

@@ -1,0 +1,40 @@
+# Oracle APEX - Downloaded installation files
+apex/
+
+# ORDS Configuration and Logs
+ords_config/
+ords_logs/
+
+# Docker Volumes
+oracle_data/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
