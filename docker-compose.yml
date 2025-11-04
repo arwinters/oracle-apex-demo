@@ -1,6 +1,17 @@
 services:
   oracle-db:
+    # Option 1: Use Oracle's official image (default - faster, no build time)
     image: container-registry.oracle.com/database/express:21.3.0-xe
+
+    # Option 2: Build your own image with APEX pre-installed (uncomment to use)
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     ORACLE_VERSION: 21.3.0-xe
+    #     APEX_VERSION: 24.2
+    # image: oracle-apex-demo:24.2
+
     platform: linux/amd64
     container_name: oracle-apex-db
     ports:
@@ -10,6 +21,7 @@ services:
       - ORACLE_CHARACTERSET=AL32UTF8
     volumes:
       - ./scripts:/opt/oracle/scripts/setup
+      - ./config:/opt/oracle/config
       - ./apex:/opt/oracle/apex
       - oracle_data:/opt/oracle/oradata
     command: ["/opt/oracle/scripts/setup/db-entrypoint-wrapper.sh"]

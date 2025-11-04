@@ -1,12 +1,22 @@
 #!/bin/bash
 set -e
 
+# Load configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="/opt/oracle/config"
+source "$CONFIG_DIR/config.env"
+
 echo "🔍 Checking APEX installation files..."
 if [ ! -f "/opt/oracle/apex/apexins.sql" ]; then
-  echo "📦 Downloading Oracle APEX 24.2..."
+  echo "⚠️  APEX files not found in image - downloading from source..."
+  echo "📦 Downloading Oracle APEX ${APEX_VERSION}..."
   cd /opt/oracle
-  curl -s -o apex_24.2.zip https://download.oracle.com/otn_software/apex/apex_24.2.zip
-  unzip -q apex_24.2.zip && rm apex_24.2.zip
+
+  # Extract filename from URL
+  APEX_ZIP=$(basename "$APEX_DOWNLOAD_URL")
+
+  curl -s -o "$APEX_ZIP" "$APEX_DOWNLOAD_URL"
+  unzip -q "$APEX_ZIP" && rm "$APEX_ZIP"
 
   # Move content up one level if nested directory exists
   if [ -d "/opt/oracle/apex/apex" ]; then
@@ -15,143 +25,75 @@ if [ ! -f "/opt/oracle/apex/apexins.sql" ]; then
     rmdir /opt/oracle/apex/apex
   fi
 
-  echo "✅ APEX 24.2 downloaded and extracted."
+  echo "✅ APEX ${APEX_VERSION} downloaded and extracted."
 else
-  echo "✅ APEX installation files found."
+  echo "✅ APEX ${APEX_VERSION} files found in image (no download needed)."
 fi
 
 echo "⏳ Waiting for Oracle Database to be ready..."
 sleep 10
 
+# Convert version to schema check (e.g., 24.2.10 -> APEX_240210)
+APEX_VERSION_CHECK="APEX_$(echo $APEX_VERSION | sed 's/\.//g')"
+
 echo "🧠 Checking if APEX is already installed..."
-if sqlplus -s / as sysdba <<EOF | grep -q "APEX_240200"
+if sqlplus -s / as sysdba <<EOF | grep -q "$APEX_VERSION_CHECK"
 SET PAGESIZE 0 FEEDBACK OFF VERIFY OFF HEADING OFF ECHO OFF
 SELECT username FROM dba_users WHERE username LIKE 'APEX_%';
 EXIT;
 EOF
 then
-  echo "⚠️  APEX already installed, skipping reinstallation."
+  echo "⚠️  APEX ${APEX_VERSION} already installed, skipping reinstallation."
 else
   echo "🚀 Starting APEX installation..."
   cd /opt/oracle/apex
-  sqlplus -s / as sysdba <<EOF
-  WHENEVER SQLERROR EXIT SQL.SQLCODE
-  ALTER SESSION SET CONTAINER = XEPDB1;
-  @apexins.sql SYSAUX SYSAUX TEMP /i/
-EOF
-fi
-
-echo "🔐 Setting APEX admin user for APEX 24.2..."
-sqlplus / as sysdba <<EOF
-ALTER SESSION SET CONTAINER = XEPDB1;
-SET SERVEROUTPUT ON
-
-BEGIN
-  APEX_UTIL.SET_WORKSPACE('INTERNAL');
-  APEX_UTIL.CREATE_USER(
-    p_user_name => 'ADMIN',
-    p_first_name => 'Admin',
-    p_last_name => 'User',
-    p_description => 'Administrator',
-    p_email_address => 'admin@example.com',
-    p_web_password => 'Welkom123',
-    p_developer_privs => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
-    p_change_password_on_first_use => 'N'
-  );
-  COMMIT;
-  DBMS_OUTPUT.PUT_LINE('✅ APEX admin user created');
-EXCEPTION
-  WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('⚠️  Admin user may already exist or error: ' || SQLERRM);
-END;
-/
-EXIT;
-EOF
-
-echo "👤 Creating and enabling REST access for APEX_DEMO schema..."
-sqlplus -s / as sysdba <<EOF
+  sqlplus / as sysdba <<EOF
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 ALTER SESSION SET CONTAINER = XEPDB1;
-
-BEGIN
-  EXECUTE IMMEDIATE 'CREATE USER APEX_DEMO IDENTIFIED BY Welkom123';
-EXCEPTION
-  WHEN OTHERS THEN
-    IF SQLCODE = -01920 THEN NULL;
-    ELSE RAISE;
-    END IF;
-END;
-/
-GRANT CONNECT, RESOURCE TO APEX_DEMO;
-ALTER USER APEX_DEMO QUOTA UNLIMITED ON USERS;
-
-BEGIN
-  ORDS_ADMIN.ENABLE_SCHEMA(
-    p_enabled => TRUE,
-    p_schema  => 'APEX_DEMO',
-    p_url_mapping_type => 'BASE_PATH',
-    p_url_mapping_pattern => 'apex_demo',
-    p_auto_rest_auth => TRUE
-  );
-  COMMIT;
-END;
-/
+@apexins.sql SYSAUX SYSAUX TEMP /i/
+EXIT;
 EOF
+  echo "✅ APEX ${APEX_VERSION} installation complete."
+fi
 
-echo "🧩 Creating default APEX workspace..."
+echo "🔐 Creating APEX admin user..."
 sqlplus / as sysdba <<EOF
-ALTER SESSION SET CONTAINER = XEPDB1;
-SET SERVEROUTPUT ON
-
-DECLARE
-  l_workspace_id NUMBER;
-BEGIN
-  APEX_UTIL.SET_WORKSPACE('INTERNAL');
-
-  APEX_UTIL.CREATE_WORKSPACE(
-    p_workspace => 'DEMO_WORKSPACE',
-    p_primary_schema => 'APEX_DEMO'
-  );
-
-  COMMIT;
-  DBMS_OUTPUT.PUT_LINE('✅ Workspace DEMO_WORKSPACE created');
-EXCEPTION
-  WHEN OTHERS THEN
-    IF SQLCODE = -20987 THEN
-      DBMS_OUTPUT.PUT_LINE('⚠️  Workspace already exists');
-    ELSE
-      DBMS_OUTPUT.PUT_LINE('⚠️  Error creating workspace: ' || SQLERRM);
-    END IF;
-END;
-/
+DEFINE APEX_ADMIN_USER='${APEX_ADMIN_USER}'
+DEFINE APEX_ADMIN_EMAIL='${APEX_ADMIN_EMAIL}'
+DEFINE APEX_ADMIN_PASSWORD='${APEX_ADMIN_PASSWORD}'
+@${SCRIPT_DIR}/sql/01_create_admin_user.sql
 EXIT;
 EOF
 
-sqlplus -s / as sysdba <<EOF
-BEGIN
-  FOR r IN (
-    SELECT username FROM dba_users WHERE username IN ('APEX_PUBLIC_USER', 'APEX_REST_PUBLIC_USER', 'APEX_LISTENER')
-  ) LOOP
-    EXECUTE IMMEDIATE 'ALTER USER ' || r.username || ' IDENTIFIED BY Welkom123';
-  END LOOP;
-END;
-/
-EOF
-
-echo "🔓 Unlocking APEX users in PDB..."
+echo "👤 Creating demo schema and enabling REST..."
 sqlplus / as sysdba <<EOF
-ALTER SESSION SET CONTAINER = XEPDB1;
-
-BEGIN
-  FOR r IN (SELECT username FROM dba_users WHERE username IN ('APEX_PUBLIC_USER', 'APEX_REST_PUBLIC_USER', 'APEX_LISTENER')) LOOP
-    EXECUTE IMMEDIATE 'ALTER USER ' || r.username || ' ACCOUNT UNLOCK';
-    DBMS_OUTPUT.PUT_LINE('Unlocked: ' || r.username);
-  END LOOP;
-END;
-/
+DEFINE DEMO_SCHEMA='${DEMO_SCHEMA}'
+DEFINE ORACLE_PWD='${ORACLE_PWD}'
+@${SCRIPT_DIR}/sql/02_create_demo_schema.sql
 EXIT;
 EOF
 
-echo "✅ All done! APEX and ORDS are ready."
+echo "🧩 Creating demo workspace..."
+sqlplus / as sysdba <<EOF
+DEFINE DEMO_WORKSPACE='${DEMO_WORKSPACE}'
+DEFINE DEMO_SCHEMA='${DEMO_SCHEMA}'
+@${SCRIPT_DIR}/sql/03_create_demo_workspace.sql
+EXIT;
+EOF
+
+echo "🔐 Setting passwords for APEX system users..."
+sqlplus / as sysdba <<EOF
+DEFINE ORACLE_PWD='${ORACLE_PWD}'
+@${SCRIPT_DIR}/sql/04_set_passwords.sql
+EXIT;
+EOF
+
+echo "🔓 Unlocking APEX system users..."
+sqlplus / as sysdba <<EOF
+@${SCRIPT_DIR}/sql/05_unlock_apex_users.sql
+EXIT;
+EOF
+
+echo "✅ All done! APEX ${APEX_VERSION} and ORDS are ready."
 echo "🌐 Access APEX: http://localhost:8181/ords/"
 echo "💻 Access SQL Developer Web: http://localhost:8181/ords/sql-developer"
