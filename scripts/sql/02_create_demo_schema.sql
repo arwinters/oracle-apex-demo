@@ -22,16 +22,4 @@ END;
 GRANT CONNECT, RESOURCE TO &DEMO_SCHEMA;
 ALTER USER &DEMO_SCHEMA QUOTA UNLIMITED ON USERS;
 
--- Enable REST access via ORDS
-BEGIN
-  ORDS_ADMIN.ENABLE_SCHEMA(
-    p_enabled => TRUE,
-    p_schema  => '&DEMO_SCHEMA',
-    p_url_mapping_type => 'BASE_PATH',
-    p_url_mapping_pattern => LOWER('&DEMO_SCHEMA'),
-    p_auto_rest_auth => TRUE
-  );
-  COMMIT;
-  DBMS_OUTPUT.PUT_LINE('✅ REST enabled for schema: &DEMO_SCHEMA');
-END;
-/
+-- Note: REST enablement happens AFTER ORDS registration (see 06_enable_rest_schema.sql)

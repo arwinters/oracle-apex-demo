@@ -23,14 +23,15 @@ services:
       - ./scripts:/opt/oracle/scripts/setup
       - ./config:/opt/oracle/config
       - ./apex:/opt/oracle/apex
+      - ./logs:/opt/oracle/logs
       - oracle_data:/opt/oracle/oradata
     command: ["/opt/oracle/scripts/setup/db-entrypoint-wrapper.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s / as sysdba | grep -q 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "test -f /tmp/apex_ready && echo 'SELECT 1 FROM DUAL;' | sqlplus -s / as sysdba | grep -q 1"]
+      interval: 10s
       timeout: 10s
-      retries: 10
-      start_period: 60s
+      retries: 30
+      start_period: 120s
 
   ords:
     image: container-registry.oracle.com/database/ords:latest
@@ -53,7 +54,9 @@ services:
       - ./ords_config:/etc/ords/config
       - ./ords_logs:/etc/ords/logs
       - ./scripts:/opt/oracle/scripts/setup
+      - ./config:/opt/oracle/config:ro
       - ./apex:/opt/oracle/apex:ro
+      - ./logs:/opt/oracle/logs
     entrypoint: ["/bin/bash"]
     command: ["/opt/oracle/scripts/setup/start_ords.sh"]
     healthcheck:
