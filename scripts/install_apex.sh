@@ -87,11 +87,12 @@ DEFINE ORACLE_PWD='${ORACLE_PWD}'
 EXIT;
 EOF
 
-log "🧩 Creating demo workspace..."
+log "🧩 Creating demo workspace and user..."
 log "Executing 03_create_demo_workspace.sql..."
 sqlplus / as sysdba <<EOF 2>&1 | tee -a "$LOG_FILE"
 DEFINE DEMO_WORKSPACE='${DEMO_WORKSPACE}'
 DEFINE DEMO_SCHEMA='${DEMO_SCHEMA}'
+DEFINE ORACLE_PWD='${ORACLE_PWD}'
 @${SCRIPT_DIR}/sql/03_create_demo_workspace.sql
 EXIT;
 EOF

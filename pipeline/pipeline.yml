@@ -1,0 +1,27 @@
+trigger:
+  branches:
+    include:
+      - main
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - script: |
+          echo "Hello Tony"
+        displayName: Build Script
+
+- stage: Deploy
+  dependsOn: Build
+  jobs:
+  - job: DeployJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - script: |
+          echo "Hello Tony"
+        displayName: Deploy Script
+
