@@ -15,7 +15,7 @@ Oracle APEX 24.2 met Oracle XE 21.3.0 en ORDS in Docker Compose.
 ### 1. Clone repository
 Zorg dat je in je projectmap bent:
 ```bash
-git clone 
+git clone https://github.com/arwinters/oracle-apex-demo.git
 cd ./oracle-apex-demo
 ```
 
