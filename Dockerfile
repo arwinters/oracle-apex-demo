@@ -32,13 +32,21 @@ LABEL apex.version="${APEX_VERSION}"
 LABEL oracle.version="${ORACLE_VERSION}"
 LABEL maintainer="your-team@example.com"
 
-# Copy APEX from builder stage
-USER oracle
+# Copy APEX from builder stage (as root, before switching to oracle user)
 COPY --from=builder /tmp/apex /opt/oracle/apex
 
 # Copy setup scripts and configuration
 COPY --chown=oracle:oinstall scripts/ /opt/oracle/scripts/setup/
 COPY --chown=oracle:oinstall config/ /opt/oracle/config/
+
+# Create logs directory with correct permissions BEFORE switching to oracle user
+RUN mkdir -p /opt/oracle/logs && \
+    chown -R oracle:oinstall /opt/oracle/logs && \
+    chmod -R 755 /opt/oracle/logs && \
+    ls -la /opt/oracle/ | grep logs
+
+# Now switch to oracle user
+USER oracle
 
 EXPOSE 1521
 
