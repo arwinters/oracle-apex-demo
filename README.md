@@ -17,7 +17,6 @@ Zorg dat je in je projectmap bent:
 ```bash
 git clone https://github.com/arwinters/oracle-apex-demo.git
 cd ./oracle-apex-demo
-mkdir ./logs ./config ./apex ./ords_config ./ords_logs
 ```
 
 ### 2. (Alleen WSL2) Maak directories aan en stel eigenaar in
@@ -31,6 +30,7 @@ docker run --rm container-registry.oracle.com/database/express:21.3.0-xe id orac
 
 2) Pas eigenaar en permissies aan op je host via WSL 2:
 ```bash
+mkdir ./logs ./config ./apex ./ords_config ./ords_logs
 sudo chown -R 54321:54321 ./logs ./scripts ./config ./apex ./ords_config ./ords_logs
 sudo chmod -R 755 ./logs ./scripts ./config ./apex ./ords_config ./ords_logs
 ```
@@ -81,6 +81,8 @@ docker compose logs -f ords
 Healthcheck is ingesteld in `docker-compose.yml`. Startup kan enkele minuten duren (APEX installatie).
 
 ## Toegang
+
+![Playground Oracle Docker](demo_oracle_docker.png) 
 
 - Oracle Database: localhost:1521
   - Wachtwoord: zie `docker-compose.yml`
